@@ -23,7 +23,7 @@ def list_ports():
         dev_port += 1
     return available_ports, working_ports
 
-#if its not already in capstone-project-Eye-gazing, we want it there
+#if its not already in capstone-project-Eye-gazing, we want it there cuz thats our WD
 def normalize_path_for_cwd(cwd, path):
     if 'capstone-project-Eye-gazing' not in cwd:
         return 'capstone-project-Eye-gazing/' + path

@@ -10,6 +10,7 @@ import pyttsx3
 from eye_key_funcs import *
 from projected_keyboard import get_keyboard
 from utility import normalize_path_for_cwd
+from eye_typing.eye_key_funcs import show_window
 
 #-----------VOICE ENGINE STUFF NOT WORKING NOW-----------------
 # voiceEngine = pyttsx3.init()
@@ -21,7 +22,7 @@ from utility import normalize_path_for_cwd
 # voiceEngine.runAndWait()
 
 # # ------------------------------------ Inputs
-camera_ID = 1  # select webcam
+camera_ID = 0  # select webcam
 
 width_keyboard, height_keyboard = 1000, 500 # [pixels]
 offset_keyboard = (100, 80) # pixel offset (x, y) of keyboard coordinates
@@ -76,7 +77,6 @@ while(corner<4): # calibration of 4 corners
     frame = adjust_frame(frame)  # rotate / flip
 
     gray_scale_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) # gray-scale to work with
-    show_window("gray_scale_frame", gray_scale_frame)
     
     #cv2.putText(image, text, org, font, fontScale, color[, thickness[, lineType[, bottomLeftOrigin]]])
     #org is the coordinates of the bottom-left corner of the text string in the image. The coordinates are represented as tuples of two values i.e. (X coordinate value, Y coordinate value).
@@ -96,6 +96,9 @@ while(corner<4): # calibration of 4 corners
         display_box_around_face(frame, [face.left(), face.top(), face.right(), face.bottom()], 'green', (20, 40))
 
         landmarks = predictor(gray_scale_frame, face) # find points in face
+        landmarks_parts = landmarks.parts()
+        landmarks_mat = np.matrix([[p.x, p.y] for p in landmarks.parts()])  
+
         #display_face_points(frame, landmarks, [0, 68], color='red') # draw face points
         #print('landmarks',landmarks)
         # get position of right eye and display lines
@@ -105,7 +108,7 @@ while(corner<4): # calibration of 4 corners
         #print("right_eye_coordinates",right_eye_coordinates)
 
 
-        # define the coordinates of the pupil from the centroid of the right eye
+        # define the coordinates of the pupil from the centroid of the right eye (mean of top + bottom)
         pupil_coordinates = np.mean([right_eye_coordinates[2], right_eye_coordinates[3]], axis = 0).astype('int')
 
 
@@ -138,9 +141,11 @@ cv2.destroyAllWindows()
 # -------------------------------------------------------------------
 
 # ------------------------------------------------------------------- PROCESS CALIBRATIONcalibration cut [array([170, 289]), array([277, 335]), array([409, 292]), array([183, 399])]
-calibration_cut = [[170,289],[277,335],[409,292],[183,399]]
+
+#use this if we know te proper calibration cut without doing the above process
+# calibration_cut = [[170,289],[277,335],[409,292],[183,399]]
 # find limits & offsets for the calibrated frame-cut
-x_cut_min, x_cut_max, y_cut_min, y_cut_max = find_cut_limits(calibration_cut)
+x_cut_min, x_cut_max, y_cut_min, y_cut_max = find_cut_limits(calibration_cut, 20)
 offset_calibrated_cut = [ x_cut_min, y_cut_min ]
 
 # ----------------- message for user
@@ -166,9 +171,8 @@ while(True):
     ret, frame = camera.read()   # Capture frame
     frame = adjust_frame(frame)  # rotate / flip"
     #print("rotating frame",frame)
-    #print("frame",frame)
-    #print(frame[y_cut_min:y_cut_max, x_cut_min:x_cut_max, :])
-
+    # print("frame",frame)
+    # print(frame[y_cut_min:y_cut_max, x_cut_min:x_cut_max, :])
     cut_frame = np.copy(frame[y_cut_min:y_cut_max, x_cut_min:x_cut_max, :])
     #print("cut_frame",cut_frame)
     #print("cut frame is",cut_frame)
@@ -210,6 +214,8 @@ while(True):
         pupil_on_cut = np.array([pupil_cordinates[0] - offset_calibrated_cut[0], pupil_cordinates[1] - offset_calibrated_cut[1]])
         #print("pupil_on_cut",pupil_on_cut)
 
+        print(cut_frame)
+        print(type(cut_frame))
         #drawing blue circle on cutfram on pupil
         cv2.circle(cut_frame, (pupil_on_cut[0], pupil_on_cut[1]), int(take_radius_eye(right_eye_coordinates)/1.5), (255, 0, 0), 1)
 

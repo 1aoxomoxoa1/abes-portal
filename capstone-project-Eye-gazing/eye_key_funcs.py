@@ -7,7 +7,6 @@ import sys
 import pyttsx3
 
 
-
 print("\n\n" + sys.executable)
 # voiceEngine = pyttsx3.init()
 # newVoiceRate = 150
@@ -15,7 +14,10 @@ print("\n\n" + sys.executable)
 # voiceEngine.setProperty('rate', newVoiceRate)
 # voiceEngine.setProperty('volume', newVolume)
 # # ------------------------------------ Inputs
-ratio_blinking = 0.2  # calibrate with my eyes
+
+
+#-----RECALIBRATE FOR ABE --------
+RATIO_BLINKING = 0.23  # calibrate with my eyes
 dict_color = {'green': (0, 255, 0),
               'blue': (255, 0, 0),
               'red': (0, 0, 255),
@@ -97,11 +99,13 @@ def half_point(p1, p2):
 
 # ----- get coordinates eye
 def get_eye_coordinates(landmarks, points):
+
+
     x_left = (landmarks.part(points[0]).x, landmarks.part(points[0]).y)
     x_right = (landmarks.part(points[3]).x, landmarks.part(points[3]).y)
-
     y_top = half_point(landmarks.part(points[1]), landmarks.part(points[2]))
     y_bottom = half_point(landmarks.part(points[5]), landmarks.part(points[4]))
+
 
     return x_left, x_right, y_top, y_bottom
 
@@ -110,8 +114,8 @@ def get_eye_coordinates(landmarks, points):
 
 # ----- draw line on eyes
 def display_eye_lines(img, coordinates, color):
-    cv2.line(img, coordinates[0], coordinates[1], dict_color[color], 2)
-    cv2.line(img, coordinates[2], coordinates[3], dict_color[color], 2)
+    cv2.line(img, coordinates[0], coordinates[1], dict_color[color], 2) #left side to right side
+    cv2.line(img, coordinates[2], coordinates[3], dict_color["red"], 2) #top to bottom
 
 
 # --------------------------------------------------
@@ -138,9 +142,14 @@ def is_blinking(eye_coordinates):
     minor_axis = np.sqrt(
         (eye_coordinates[3][0] - eye_coordinates[2][0]) ** 2 + (eye_coordinates[3][1] - eye_coordinates[2][1]) ** 2)
 
-    ratio = minor_axis / major_axis
 
-    if ratio < ratio_blinking: blinking = True
+    
+    ratio = minor_axis / major_axis
+    print("major axis: ", major_axis)
+    print("minor axis: ", minor_axis)
+    print("ratio: ", ratio)
+
+    if ratio < RATIO_BLINKING: blinking = True
 
     return blinking
 
@@ -148,7 +157,7 @@ def is_blinking(eye_coordinates):
 # --------------------------------------------------
 
 # ----- find the limits of frame-cut around the calibrated box
-def find_cut_limits(calibration_cut):
+def find_cut_limits(calibration_cut, padding):
     x_cut_max = np.array(calibration_cut)
     x_cut_min = np.array(calibration_cut)
     y_cut_max = np.array(calibration_cut)
@@ -159,24 +168,38 @@ def find_cut_limits(calibration_cut):
     y_cut_max1 = np.transpose(y_cut_max)
     y_cut_min1 = np.transpose(y_cut_min)
 
-    x_cut_max2 = x_cut_max1[0].max()
-    x_cut_min2 = x_cut_min1[0].min()
-    y_cut_max2 = y_cut_max1[1].max()
-    y_cut_min2 = y_cut_min1[1].min()
-    '''print("x_cut_min",x_cut_min)
-    print("x_cut_max",x_cut_max)
-    print("y_cut_min",y_cut_min)
-    print("y_cut_max",y_cut_max)
+    #add padding so there is some pixels surrounding the cut for the eye
+    x_cut_max2 = x_cut_max1[0].max() + padding
+    x_cut_min2 = x_cut_min1[0].min() - padding
+    y_cut_max2 = y_cut_max1[1].max() + padding
+    y_cut_min2 = y_cut_min1[1].min() - padding
+    
+    mean_x = (x_cut_min2 + x_cut_max2) / 2
+    mean_y = (y_cut_min2 + y_cut_max2) / 2
+    # print("x_cut_min",x_cut_min)
+    # print("x_cut_max",x_cut_max)
+    # print("y_cut_min",y_cut_min)
+    # print("y_cut_max",y_cut_max)
 
-    print("x_cut_min1", x_cut_min1)
-    print("x_cut_max1", x_cut_max1)
-    print("y_cut_min1", y_cut_min1)
-    print("y_cut_max1", y_cut_max1)'''
+    # print("x_cut_min1", x_cut_min1)
+    # print("x_cut_max1", x_cut_max1)
+    # print("y_cut_min1", y_cut_min1)
+    # print("y_cut_max1", y_cut_max1)
 
-    # print("x_cut_min2", x_cut_min2)
-    # print("x_cut_max2", x_cut_max2)
-    # print("y_cut_min2", y_cut_min2)
-    # print("y_cut_max2", y_cut_max2)
+    # if(x_cut_min2 > x_cut_max2):
+    #     x_cut_max2 =  -x_cut_min2
+    # else:
+    #     x_cut_min2 = -x_cut_max2
+
+    # if(y_cut_min2 > y_cut_max2):
+    #     y_cut_max2 = -y_cut_min2
+    # else:
+    #     y_cut_min2 = -y_cut_max2
+
+    print("x_cut_min2", x_cut_min2)
+    print("x_cut_max2", x_cut_max2)
+    print("y_cut_min2", y_cut_min2)
+    print("y_cut_max2", y_cut_max2)
 
     return x_cut_min2, x_cut_max2, y_cut_min2, y_cut_max2
 
