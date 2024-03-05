@@ -10,7 +10,6 @@ import pyttsx3
 from eye_key_funcs import *
 from projected_keyboard import get_keyboard
 from utility import normalize_path_for_cwd
-from eye_typing.eye_key_funcs import show_window
 
 #-----------VOICE ENGINE STUFF NOT WORKING NOW-----------------
 # voiceEngine = pyttsx3.init()
@@ -22,7 +21,7 @@ from eye_typing.eye_key_funcs import show_window
 # voiceEngine.runAndWait()
 
 # # ------------------------------------ Inputs
-camera_ID = 0  # select webcam
+camera_ID = 1  # select webcam
 
 width_keyboard, height_keyboard = 1000, 500 # [pixels]
 offset_keyboard = (100, 80) # pixel offset (x, y) of keyboard coordinates
@@ -75,9 +74,11 @@ while(corner<4): # calibration of 4 corners
 
     ret, frame = camera.read()   # Capture frame
     frame = adjust_frame(frame)  # rotate / flip
+    if ret == False:
+        continue
 
     gray_scale_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) # gray-scale to work with
-    
+
     #cv2.putText(image, text, org, font, fontScale, color[, thickness[, lineType[, bottomLeftOrigin]]])
     #org is the coordinates of the bottom-left corner of the text string in the image. The coordinates are represented as tuples of two values i.e. (X coordinate value, Y coordinate value).
     # messages for calibration
@@ -90,7 +91,6 @@ while(corner<4): # calibration of 4 corners
     if len(faces)> 1:
 
         print('please avoid multiple faces.')
-        sys.exit()
 
     for face in faces:
         display_box_around_face(frame, [face.left(), face.top(), face.right(), face.bottom()], 'green', (20, 40))
@@ -145,7 +145,7 @@ cv2.destroyAllWindows()
 #use this if we know te proper calibration cut without doing the above process
 # calibration_cut = [[170,289],[277,335],[409,292],[183,399]]
 # find limits & offsets for the calibrated frame-cut
-x_cut_min, x_cut_max, y_cut_min, y_cut_max = find_cut_limits(calibration_cut, 20)
+x_cut_min, x_cut_max, y_cut_min, y_cut_max = find_cut_limits(calibration_cut, 30)
 offset_calibrated_cut = [ x_cut_min, y_cut_min ]
 
 # ----------------- message for user
@@ -189,6 +189,8 @@ while(True):
 
 
     gray_scale_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) # gray-scale to work with
+    
+
 
     faces = detector(gray_scale_frame)  # detect faces in frame
     if len(faces)> 1:
@@ -204,21 +206,23 @@ while(True):
 
         # get position of right eye and display lines
         right_eye_coordinates = get_eye_coordinates(landmarks, [42, 43, 44, 45, 46, 47])
-        display_eye_lines(frame, right_eye_coordinates, 'green')
+        frame_w_eye_lines = return_display_eye_lines(frame, right_eye_coordinates, 'green')
 
-         # define the coordinates of the pupil from the centroid of the right eye
-
+        # define the coordinates of the pupil from the centroid of the right eye
         pupil_cordinates = np.mean([right_eye_coordinates[2], right_eye_coordinates[3]], axis = 0).astype('int')
         #print("pupil on frame",pupil_on_frame)
 
         pupil_on_cut = np.array([pupil_cordinates[0] - offset_calibrated_cut[0], pupil_cordinates[1] - offset_calibrated_cut[1]])
         #print("pupil_on_cut",pupil_on_cut)
 
-        print(cut_frame)
-        print(type(cut_frame))
+        print(f'pupil coordinates: {pupil_coordinates}')
+        print(f'major axis idx: {get_major_axis_idx(right_eye_coordinates)}')
+        print(f'minor axis idx: {get_minor_axis_idx(right_eye_coordinates)}')
         #drawing blue circle on cutfram on pupil
         cv2.circle(cut_frame, (pupil_on_cut[0], pupil_on_cut[1]), int(take_radius_eye(right_eye_coordinates)/1.5), (255, 0, 0), 1)
 
+
+        #if we find the pupil IN DA CUT
         if pupil_on_cut_valid(pupil_on_cut, cut_frame):
 
             pupil_on_keyboard = project_on_page(img_from = cut_frame[:,:, 0], # needs a 2D image for the 2D shape
@@ -231,6 +235,8 @@ while(True):
             # pupil_on_tkinter = project_on_page(img_from=cut_frame[:, :, 0],  # needs a 2D image for the 2D shape
             #                                     img_to=show_windows(),  # needs a 2D image for the 2D shape
             #                                     point=pupil_on_cut)
+
+            frame_pupil(frame, frame_w_eye_lines, right_eye_coordinates)
 
             # draw circle at pupil_on_keyboard on the keyboard
             cv2.circle(keyboard_page, (pupil_on_keyboard[0], pupil_on_keyboard[1]), 20, (0, 255, 0), 2)
@@ -283,7 +289,7 @@ while(True):
 
                 time.sleep(0.1) # to avoid is_blinking=True in the next frame
 
-        # print on screen the string
+        #print on screen the string
             y0, dy = 50,60
             for i, line in enumerate(string_to_write.split('##')):
                 y = y0 + i * dy

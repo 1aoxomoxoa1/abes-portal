@@ -95,6 +95,13 @@ def half_point(p1, p2):
     return int((p1.x + p2.x) / 2), int((p1.y + p2.y) / 2)
 
 
+#the minor axis is vertical axis , top to bottom of eye
+def get_minor_axis_idx(eye_coordinates):
+    return (eye_coordinates[2][0] + eye_coordinates[3][0]) / 2 
+
+
+def get_major_axis_idx(eye_coordinates):
+    return (eye_coordinates[0][1] + eye_coordinates[1][1]) / 2 
 # --------------------------------------------------
 
 # ----- get coordinates eye
@@ -113,10 +120,20 @@ def get_eye_coordinates(landmarks, points):
 # --------------------------------------------------
 
 # ----- draw line on eyes
+#------ img frame param CHANGES
 def display_eye_lines(img, coordinates, color):
     cv2.line(img, coordinates[0], coordinates[1], dict_color[color], 2) #left side to right side
     cv2.line(img, coordinates[2], coordinates[3], dict_color["red"], 2) #top to bottom
 
+
+# ----- this returns a frame with lines on the eyes, and leaves the img paramater unchanged
+def return_display_eye_lines(img, coordinates, color):
+    im_lines = img.copy()
+
+    cv2.line(im_lines, coordinates[0], coordinates[1], dict_color[color], 2) #left side to right side
+    cv2.line(im_lines, coordinates[2], coordinates[3], dict_color["red"], 2) #top to bottom
+
+    return im_lines
 
 # --------------------------------------------------
 
@@ -203,14 +220,14 @@ def find_cut_limits(calibration_cut, padding):
 
     return x_cut_min2, x_cut_max2, y_cut_min2, y_cut_max2
 
+# print(find_cut_limits([[170,289],[277,335],[409,292],[183,399]], 0))
 
 # --------------------------------------------------
-
 # ----- find if the pupil is in the calibrated frame
-def pupil_on_cut_valid(pupil_on_cut, cut_frame):
+def pupil_on_cut_valid(pupil_on_cut, frame):
     in_frame_cut = False
-    condition_x = ((pupil_on_cut[0] > 0) & (pupil_on_cut[0] < cut_frame.shape[1]))
-    condition_y = ((pupil_on_cut[1] > 0) & (pupil_on_cut[1] < cut_frame.shape[0]))
+    condition_x = ((pupil_on_cut[0] > 0) & (pupil_on_cut[0] < frame.shape[1]))
+    condition_y = ((pupil_on_cut[1] > 0) & (pupil_on_cut[1] < frame.shape[0]))
     if condition_x and condition_y:
         in_frame_cut = True
     # print("cut fram.shape[0]", cut_frame.shape[0])
@@ -218,6 +235,70 @@ def pupil_on_cut_valid(pupil_on_cut, cut_frame):
     # print("result for pupil on cut valid",in_frame_cut)
 
     return in_frame_cut
+
+
+def get_pupil_dark_area(frame):
+    # Convert the image from BGR to HSV color space
+    # bgr = cv2.cvtColor(np.copy(frame), cv2.COLOR_GRAY2BGR)
+    hsv_image = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    gray_image = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+    #so , on the grayscale, any pixel less than 30 will be assigned to 0 or pure blk
+    threshold_value = 50  # Adjust as needed
+
+
+    # a mask is the same size as our image, but has only two pixel
+    # values, 0 and 255 -- pixels with a value of 0 (background) are
+    # ignored in the original image while mask pixels with a value of
+    # 255 (foreground) are allowed to be kept
+    # Create a binary mask where pixels below the threshold are set to 255 (white) and others to 0 (black)
+    _, binary_mask = cv2.threshold(gray_image, threshold_value, 255, cv2.THRESH_BINARY)
+
+    # Apply the binary mask to the original image
+    # result = cv2.bitwise_and(gray_image, gray_image, mask=binary_mask)
+
+    # Create a binary result image
+    result = np.zeros_like(gray_image)
+    result[binary_mask > 0] = 255
+
+    # Define the lower and upper bounds of the color you want to identify
+    #ref this link to try to get good HSV bounds 
+    #https://web.cs.uni-paderborn.de/cgvb/colormaster/web/color-systems/hsv.html
+    # sensitivity = 15
+    # lower_white = np.array([0,0,255-sensitivity])
+    # upper_white = np.array([255,sensitivity,255])
+
+    # # Create a mask using inRange to threshold the image
+    # mask = cv2.inRange(hsv_image, lower_white, upper_white)
+
+    # # Bitwise-AND the original image and the mask to get the result
+    # result = cv2.bitwise_and(frame, frame, mask=mask)
+
+    # result_frame = frame - result
+    
+    return result
+
+#frame the pupil, step before we search for contrast to locate it within the eye
+#frame: this is the OG frame 720 x 1280 
+def frame_pupil(frame: np.ndarray, frame_w_eye_lines, eye_coordinates):
+    resize_eye_frame = 4.5 # scaling factor for window's size
+    resize_frame = 0.3 # scaling factor for window's size
+    end_frame_length = 250 #want final frame to be 250px
+    print("from frame_pupil()")
+    print(frame.shape)
+
+
+    x_cut_min, x_cut_max, y_cut_min, y_cut_max = find_cut_limits(eye_coordinates, 10)
+    crop_pupil_frame = np.copy(frame[y_cut_min:y_cut_max, x_cut_min:x_cut_max, :])
+    pupil_white_frame = get_pupil_dark_area(crop_pupil_frame)
+    
+    
+
+    # crop_frame = np.copy(frame[y_cut_min:y_cut_max, x_cut_min:x_cut_max, :])
+    # show_window("cut-to-eye", cv2.resize(crop_frame, (int(crop_frame.shape[1] *resize_eye_frame), int(crop_frame.shape[0] *resize_eye_frame))))
+    show_window("pupil-masked", cv2.resize(pupil_white_frame, (end_frame_length, end_frame_length)))
+    show_window("cut-to-eye-w-lines", cv2.resize(np.copy(frame_w_eye_lines[y_cut_min:y_cut_max, x_cut_min:x_cut_max, :]), (end_frame_length, end_frame_length)))
+
 
 
 # --------------------------------------------------

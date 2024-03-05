@@ -29,3 +29,5 @@ def normalize_path_for_cwd(cwd, path):
         return 'capstone-project-Eye-gazing/' + path
     else:
         return path
+    
+list_ports()

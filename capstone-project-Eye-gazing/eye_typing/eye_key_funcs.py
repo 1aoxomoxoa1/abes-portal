@@ -4,10 +4,8 @@ import random
 import time
 import dlib
 import sys
-import nltk
 import time
 from collections import defaultdict
-import pygtrie
 import re
 import os
 import argparse
