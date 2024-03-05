@@ -1,4 +1,7 @@
 import cv2
+from inspect import getsourcefile
+from os.path import abspath
+import os
 
 def list_ports():
     is_working = True
@@ -25,9 +28,18 @@ def list_ports():
 
 #if its not already in capstone-project-Eye-gazing, we want it there cuz thats our WD
 def normalize_path_for_cwd(cwd, path):
+    #fix package path as global variable
+    #get path of currently executing file insead of cwd
+    path_to_utility = os.path.abspath(__file__)
+    os.path.dirname
+
+    
     if 'capstone-project-Eye-gazing' not in cwd:
         return 'capstone-project-Eye-gazing/' + path
     else:
         return path
+    
+
+normalize_path_for_cwd(os.cw)
     
 list_ports()
