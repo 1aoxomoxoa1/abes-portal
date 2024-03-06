@@ -1,0 +1,2 @@
+good resourcev for learning more image processing
+https://saskeli.github.io/data-analysis-with-python-summer-2019/image_processing.html#:~:text=A%20grayscale%20image%20can%20be,integer%20between%200%20and%20255.

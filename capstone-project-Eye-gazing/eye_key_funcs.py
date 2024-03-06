@@ -151,8 +151,8 @@ def display_face_points(img, landmarks, points_to_draw, color):
 def is_blinking(eye_coordinates):
     blinking = False
 
-    print("eye coordinates")
-    print(eye_coordinates)
+    # print("eye coordinates")
+    # print(eye_coordinates)
 
     major_axis = np.sqrt(
         (eye_coordinates[1][0] - eye_coordinates[0][0]) ** 2 + (eye_coordinates[1][1] - eye_coordinates[0][1]) ** 2)
@@ -162,9 +162,9 @@ def is_blinking(eye_coordinates):
 
     
     ratio = minor_axis / major_axis
-    print("major axis: ", major_axis)
-    print("minor axis: ", minor_axis)
-    print("ratio: ", ratio)
+    # print("major axis: ", major_axis)
+    # print("minor axis: ", minor_axis)
+    # print("ratio: ", ratio)
 
     if ratio < RATIO_BLINKING: blinking = True
 
@@ -172,7 +172,6 @@ def is_blinking(eye_coordinates):
 
 
 # --------------------------------------------------
-
 # ----- find the limits of frame-cut around the calibrated box
 def find_cut_limits(calibration_cut, padding):
     x_cut_max = np.array(calibration_cut)
@@ -191,8 +190,6 @@ def find_cut_limits(calibration_cut, padding):
     y_cut_max2 = y_cut_max1[1].max() + padding
     y_cut_min2 = y_cut_min1[1].min() - padding
     
-    mean_x = (x_cut_min2 + x_cut_max2) / 2
-    mean_y = (y_cut_min2 + y_cut_max2) / 2
     # print("x_cut_min",x_cut_min)
     # print("x_cut_max",x_cut_max)
     # print("y_cut_min",y_cut_min)
@@ -213,15 +210,14 @@ def find_cut_limits(calibration_cut, padding):
     # else:
     #     y_cut_min2 = -y_cut_max2
 
-    print("x_cut_min2", x_cut_min2)
-    print("x_cut_max2", x_cut_max2)
-    print("y_cut_min2", y_cut_min2)
-    print("y_cut_max2", y_cut_max2)
+    # print("x_cut_min2", x_cut_min2)
+    # print("x_cut_max2", x_cut_max2)
+    # print("y_cut_min2", y_cut_min2)
+    # print("y_cut_max2", y_cut_max2)
 
     return x_cut_min2, x_cut_max2, y_cut_min2, y_cut_max2
 
 # print(find_cut_limits([[170,289],[277,335],[409,292],[183,399]], 0))
-
 # --------------------------------------------------
 # ----- find if the pupil is in the calibrated frame
 def pupil_on_cut_valid(pupil_on_cut, frame):
@@ -236,6 +232,17 @@ def pupil_on_cut_valid(pupil_on_cut, frame):
 
     return in_frame_cut
 
+#first frame we want to run this before we start finding the center of mass frame by frame
+def get_calibrated_pupil_threshold(frame):
+    #found through minimal testing 
+    DOPE_RATIO_FOR_BW_BALACNCE = .06
+    
+    threshold = 30 #start w arbitrary num
+    optimized = False
+    while(not optimized): #run until good
+        pass 
+
+
 
 def get_pupil_dark_area(frame):
     # Convert the image from BGR to HSV color space
@@ -244,7 +251,7 @@ def get_pupil_dark_area(frame):
     gray_image = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
     #so , on the grayscale, any pixel less than 30 will be assigned to 0 or pure blk
-    threshold_value = 50  # Adjust as needed
+    threshold_value = 35  # Adjust as needed
 
 
     # a mask is the same size as our image, but has only two pixel
@@ -260,6 +267,9 @@ def get_pupil_dark_area(frame):
     # Create a binary result image
     result = np.zeros_like(gray_image)
     result[binary_mask > 0] = 255
+
+    bw_ratio = np.count_nonzero(result == 0) / np.count_nonzero(result == 255)
+    print(f'dope ratio : {bw_ratio}')
 
     # Define the lower and upper bounds of the color you want to identify
     #ref this link to try to get good HSV bounds 
@@ -278,26 +288,72 @@ def get_pupil_dark_area(frame):
     
     return result
 
+
+#remember: the center of mass is derived from the MASS OF BLACK PIXELS
+#the higher the threshold, the wider the striaght range will be 
+def get_direction_from_center_of_mass(gray_scale_frame, center_mass_coords: tuple):
+    threshold_factor = .2
+    shape = gray_scale_frame.shape
+    
+    #get the middle for x and y of the frame
+    center_frame_y = shape[0] / 2
+    center_frame_x = shape[1] / 2
+
+    print(f'center frame x = {center_frame_x}')
+    print(f'center frame y = {center_frame_y}')
+
+    x_threshold_straight = shape[1] * threshold_factor 
+    y_threshold_straight = shape[0] * threshold_factor
+
+    if(center_mass_coords[0] < center_frame_x - (x_threshold_straight * .5)):
+        print("LEFT")
+    elif(center_mass_coords[0] > center_frame_x + (x_threshold_straight * .5)):
+        print("RIGHT")
+    else: 
+        print("STRAIGHT")
+
+
+
+#this function will take the BW frame with the pupil and return the center of mass
+def get_center_of_mass(gray_scale_frame):
+    # Find indices where we have mass, the black pixels of the smaller frame
+    mass_x, mass_y = np.where(gray_scale_frame == 0)
+  
+  
+    # mass_x and mass_y are the list of x indices and y indices of mass pixels
+    #NOTE: in image processing , x indexes represent the rows, or like the height of an image
+    # y indexes will represent the columns, translating to the width of the image
+    cent_x = np.average(mass_y)
+    cent_y = np.average(mass_x)
+
+    print('gray scale frame shape: ' , gray_scale_frame.shape)
+
+    print(f'cent_x: {cent_x}')
+    print(f'cent_y: {cent_y}')
+
+    get_direction_from_center_of_mass(gray_scale_frame, (cent_x, cent_y))
+
+    return cent_x, cent_y
+
+
+
+
+
 #frame the pupil, step before we search for contrast to locate it within the eye
 #frame: this is the OG frame 720 x 1280 
-def frame_pupil(frame: np.ndarray, frame_w_eye_lines, eye_coordinates):
+def frame_pupil(frame: np.ndarray, frame_w_eye_lines, eye_coordinates) -> np.ndarray:
     resize_eye_frame = 4.5 # scaling factor for window's size
     resize_frame = 0.3 # scaling factor for window's size
     end_frame_length = 250 #want final frame to be 250px
-    print("from frame_pupil()")
-    print(frame.shape)
-
 
     x_cut_min, x_cut_max, y_cut_min, y_cut_max = find_cut_limits(eye_coordinates, 10)
     crop_pupil_frame = np.copy(frame[y_cut_min:y_cut_max, x_cut_min:x_cut_max, :])
-    pupil_white_frame = get_pupil_dark_area(crop_pupil_frame)
-    
-    
+    print('crop_pupil_frame shape: ', crop_pupil_frame.shape)
+    pupil_bw_frame = get_pupil_dark_area(crop_pupil_frame)
+    get_center_of_mass(pupil_bw_frame)
 
     # crop_frame = np.copy(frame[y_cut_min:y_cut_max, x_cut_min:x_cut_max, :])
-    # show_window("cut-to-eye", cv2.resize(crop_frame, (int(crop_frame.shape[1] *resize_eye_frame), int(crop_frame.shape[0] *resize_eye_frame))))
-    show_window("pupil-masked", cv2.resize(pupil_white_frame, (end_frame_length, end_frame_length)))
-    show_window("cut-to-eye-w-lines", cv2.resize(np.copy(frame_w_eye_lines[y_cut_min:y_cut_max, x_cut_min:x_cut_max, :]), (end_frame_length, end_frame_length)))
+    return pupil_bw_frame
 
 
 

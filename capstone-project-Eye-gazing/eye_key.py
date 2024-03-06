@@ -10,6 +10,7 @@ import pyttsx3
 from eye_key_funcs import *
 from projected_keyboard import get_keyboard
 from utility import normalize_path_for_cwd
+from params import PATH_TO_PARAMS, PATH_TO_PACKAGE
 
 #-----------VOICE ENGINE STUFF NOT WORKING NOW-----------------
 # voiceEngine = pyttsx3.init()
@@ -88,8 +89,7 @@ while(corner<4): # calibration of 4 corners
 
     # detect faces in frame
     faces = detector(gray_scale_frame)
-    if len(faces)> 1:
-
+    if len(faces) > 1:
         print('please avoid multiple faces.')
 
     for face in faces:
@@ -114,7 +114,7 @@ while(corner<4): # calibration of 4 corners
 
 
         if is_blinking(right_eye_coordinates):
-            print('pupil coordinates',pupil_coordinates)
+            # print('pupil coordinates',pupil_coordinates)
             calibration_cut.append(pupil_coordinates)
 
 
@@ -125,7 +125,7 @@ while(corner<4): # calibration of 4 corners
             # The argument may be a floating point number to indicate a more precise sleep time.
             corner = corner + 1
 
-    print('calibration cut',calibration_cut, '    len: ', len(calibration_cut))
+    # print('calibration cut',calibration_cut, '    len: ', len(calibration_cut))
     show_window('projection', calibration_page)
     show_window('frame', cv2.resize(frame,  (630, 460)))
     #waitKey(0) will display the window infinitely until any keypress (it is suitable for image display).
@@ -166,6 +166,8 @@ pressed_key = True
 # key_on_screen = " "
 length = 0
 string_to_write = "text:"
+
+
 while(True):
 
     ret, frame = camera.read()   # Capture frame
@@ -174,6 +176,15 @@ while(True):
     # print("frame",frame)
     # print(frame[y_cut_min:y_cut_max, x_cut_min:x_cut_max, :])
     cut_frame = np.copy(frame[y_cut_min:y_cut_max, x_cut_min:x_cut_max, :])
+    
+    pupil_threshold = None
+    pupil_bw_frame = None
+
+    if(pupil_threshold == None):
+        get_calibrated_pupil_threshold()
+        continue
+
+
     #print("cut_frame",cut_frame)
     #print("cut frame is",cut_frame)
     #cut_frame = np.copy(frame[270:338, 197:430, :])
@@ -189,7 +200,7 @@ while(True):
 
 
     gray_scale_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) # gray-scale to work with
-    
+
 
 
     faces = detector(gray_scale_frame)  # detect faces in frame
@@ -215,16 +226,16 @@ while(True):
         pupil_on_cut = np.array([pupil_cordinates[0] - offset_calibrated_cut[0], pupil_cordinates[1] - offset_calibrated_cut[1]])
         #print("pupil_on_cut",pupil_on_cut)
 
-        print(f'pupil coordinates: {pupil_coordinates}')
-        print(f'major axis idx: {get_major_axis_idx(right_eye_coordinates)}')
-        print(f'minor axis idx: {get_minor_axis_idx(right_eye_coordinates)}')
+        # print(f'pupil coordinates: {pupil_coordinates}')
+        # # print(f'major axis idx: {get_major_axis_idx(right_eye_coordinates)}')
+        # print(f'minor axis idx: {get_minor_axis_idx(right_eye_coordinates)}')
         #drawing blue circle on cutfram on pupil
         cv2.circle(cut_frame, (pupil_on_cut[0], pupil_on_cut[1]), int(take_radius_eye(right_eye_coordinates)/1.5), (255, 0, 0), 1)
 
 
         #if we find the pupil IN DA CUT
         if pupil_on_cut_valid(pupil_on_cut, cut_frame):
-
+            
             pupil_on_keyboard = project_on_page(img_from = cut_frame[:,:, 0], # needs a 2D image for the 2D shape
                                                 img_to = keyboard_page[:,:, 0], # needs a 2D image for the 2D shape
                                                 point = pupil_on_cut)
@@ -236,7 +247,7 @@ while(True):
             #                                     img_to=show_windows(),  # needs a 2D image for the 2D shape
             #                                     point=pupil_on_cut)
 
-            frame_pupil(frame, frame_w_eye_lines, right_eye_coordinates)
+            pupil_bw_frame = frame_pupil(frame, frame_w_eye_lines, right_eye_coordinates)
 
             # draw circle at pupil_on_keyboard on the keyboard
             cv2.circle(keyboard_page, (pupil_on_keyboard[0], pupil_on_keyboard[1]), 20, (0, 255, 0), 2)
@@ -299,7 +310,7 @@ while(True):
 
         ##cv2.putText(image, text, org, font, fontScale, color[, thickness[, lineType[, bottomLeftOrigin]]])
 
-            # visualize windows
+    # visualize windows
 
     show_window('projection', keyboard_page)
     #show_window('image_page', image_page)
@@ -307,6 +318,15 @@ while(True):
     #print("cut fram.shape[0]",cut_frame.shape[0])
     #print("cut fram.shape[1]",cut_frame.shape[1])
     show_window('cut_frame', cv2.resize(cut_frame, (int(cut_frame.shape[1] *resize_eye_frame), int(cut_frame.shape[0] *resize_eye_frame))))
+    show_window("cut-to-eye-w-lines", cv2.resize(np.copy(frame_w_eye_lines[y_cut_min:y_cut_max, x_cut_min:x_cut_max, :]), (250, 500)))
+    show_window("cut-to-eye-w-lines-no-resize", np.copy(frame_w_eye_lines[y_cut_min:y_cut_max, x_cut_min:x_cut_max, :]))
+
+    if pupil_bw_frame is not None: 
+        show_window("pupil-masked", cv2.resize(pupil_bw_frame, (250, 250)))
+        show_window("pupil-masked-no-resze", pupil_bw_frame)
+    else:
+        print('pupil bw frame is none')
+
     show_window('text_page',text_page)
 
     if cv2.waitKey(1) & 0xFF == ord('q'):

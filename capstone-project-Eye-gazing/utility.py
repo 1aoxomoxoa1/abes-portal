@@ -30,7 +30,6 @@ def list_ports():
 def normalize_path_for_cwd(cwd, path):
     #fix package path as global variable
     #get path of currently executing file insead of cwd
-    path_to_utility = os.path.abspath(__file__)
     os.path.dirname
 
     
@@ -40,6 +39,6 @@ def normalize_path_for_cwd(cwd, path):
         return path
     
 
-normalize_path_for_cwd(os.cw)
+# normalize_path_for_cwsd(os.cw)
     
 list_ports()
