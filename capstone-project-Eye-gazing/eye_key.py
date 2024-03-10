@@ -8,7 +8,8 @@ import os
 import sys
 import pyttsx3
 from eye_key_funcs import *
-from projected_keyboard import get_keyboard
+from projected_keyboard import get_keyboard, Keyboard
+from projected_keyboard_helper import *
 from utility import normalize_path_for_cwd
 from params import PATH_TO_PARAMS, PATH_TO_PACKAGE
 
@@ -46,10 +47,9 @@ keyboard_page = make_black_page(size = size_screen)
 
 calibration_page = make_black_page(size = size_screen)
 
+keyboard = Keyboard(width_keyboard, height_keyboard, offset_keyboard, "F")
 # Initialize keyboard
-key_points = get_keyboard(width_keyboard  = width_keyboard ,
-                       height_keyboard = height_keyboard ,
-                       offset_keyboard = offset_keyboard )
+key_points = keyboard.get_keyboard()
 
 
 print(key_points)
@@ -167,7 +167,10 @@ pressed_key = True
 length = 0
 string_to_write = "text:"
 
+pupil_threshold = None
 
+
+#THIS LOOP STARTS THE KEYBOARD LOOP
 while(True):
 
     ret, frame = camera.read()   # Capture frame
@@ -176,13 +179,7 @@ while(True):
     # print("frame",frame)
     # print(frame[y_cut_min:y_cut_max, x_cut_min:x_cut_max, :])
     cut_frame = np.copy(frame[y_cut_min:y_cut_max, x_cut_min:x_cut_max, :])
-    
-    pupil_threshold = None
     pupil_bw_frame = None
-
-    if(pupil_threshold == None):
-        get_calibrated_pupil_threshold()
-        continue
 
 
     #print("cut_frame",cut_frame)
@@ -193,17 +190,16 @@ while(True):
     keyboard_page = make_black_page(size = size_screen)
     image_page = make_black_page(size = size_screen)
 
-    dysplay_keyboard(img = keyboard_page, keys = key_points)
+    dysplay_keyboard(keyboard_page, key_points, keyboard.current_key)
     #dysplay_keyboard(img = image_page, keys = key_points)
     #show_windows()
     text_page = make_white_page(size = (700, 800))
 
 
     gray_scale_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) # gray-scale to work with
-
-
-
     faces = detector(gray_scale_frame)  # detect faces in frame
+
+
     if len(faces)> 1:
         print('please avoid multiple faces..')
         sys.exit()
@@ -229,12 +225,16 @@ while(True):
         # print(f'pupil coordinates: {pupil_coordinates}')
         # # print(f'major axis idx: {get_major_axis_idx(right_eye_coordinates)}')
         # print(f'minor axis idx: {get_minor_axis_idx(right_eye_coordinates)}')
-        #drawing blue circle on cutfram on pupil
+        #drawing blue circle on cutframe on pupil
         cv2.circle(cut_frame, (pupil_on_cut[0], pupil_on_cut[1]), int(take_radius_eye(right_eye_coordinates)/1.5), (255, 0, 0), 1)
 
 
         #if we find the pupil IN DA CUT
         if pupil_on_cut_valid(pupil_on_cut, cut_frame):
+            
+            #calibrate a good pupil_threshold with the first frame we get with the pupil
+            if(pupil_threshold == None):
+                pupil_threshold = get_calibrated_pupil_threshold(frame, right_eye_coordinates)
             
             pupil_on_keyboard = project_on_page(img_from = cut_frame[:,:, 0], # needs a 2D image for the 2D shape
                                                 img_to = keyboard_page[:,:, 0], # needs a 2D image for the 2D shape
@@ -246,11 +246,14 @@ while(True):
             # pupil_on_tkinter = project_on_page(img_from=cut_frame[:, :, 0],  # needs a 2D image for the 2D shape
             #                                     img_to=show_windows(),  # needs a 2D image for the 2D shape
             #                                     point=pupil_on_cut)
+            # pupil_threshold = 60
 
-            pupil_bw_frame = frame_pupil(frame, frame_w_eye_lines, right_eye_coordinates)
+            #here we get the pupil_bw_frame
+            pupil_bw_frame, direction = frame_pupil(frame, right_eye_coordinates, pupil_threshold)
+            keyboard.get_next_key(direction)
 
             # draw circle at pupil_on_keyboard on the keyboard
-            cv2.circle(keyboard_page, (pupil_on_keyboard[0], pupil_on_keyboard[1]), 20, (0, 255, 0), 2)
+            # cv2.circle(keyboard_page, (pupil_on_keyboard[0], pupil_on_keyboard[1]), 20, (0, 255, 0), 2)
             #cv2.circle(show_windows(), (pupil_on_tkinter[0], pupil_on_tkinter[1]), 10, (0, 255, 0), 4)
             #cv2.circle(image_page, (pupil_on_image[0], pupil_on_image[1]), 10, (0, 255, 0), 4)
             # cv2.circle(image, center_coordinates, radius, color, thickness)
@@ -318,7 +321,7 @@ while(True):
     #print("cut fram.shape[0]",cut_frame.shape[0])
     #print("cut fram.shape[1]",cut_frame.shape[1])
     show_window('cut_frame', cv2.resize(cut_frame, (int(cut_frame.shape[1] *resize_eye_frame), int(cut_frame.shape[0] *resize_eye_frame))))
-    show_window("cut-to-eye-w-lines", cv2.resize(np.copy(frame_w_eye_lines[y_cut_min:y_cut_max, x_cut_min:x_cut_max, :]), (250, 500)))
+    show_window("cut-to-eye-w-lines", cv2.resize(np.copy(frame_w_eye_lines[y_cut_min:y_cut_max, x_cut_min:x_cut_max, :]), (250, 250)))
     show_window("cut-to-eye-w-lines-no-resize", np.copy(frame_w_eye_lines[y_cut_min:y_cut_max, x_cut_min:x_cut_max, :]))
 
     if pupil_bw_frame is not None: 

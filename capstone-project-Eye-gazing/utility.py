@@ -2,6 +2,8 @@ import cv2
 from inspect import getsourcefile
 from os.path import abspath
 import os
+from eye_key_funcs import *
+from projected_keyboard import get_keyboard, Keyboard
 
 def list_ports():
     is_working = True
@@ -41,4 +43,25 @@ def normalize_path_for_cwd(cwd, path):
 
 # normalize_path_for_cwsd(os.cw)
     
-list_ports()
+# list_ports()
+
+# width_keyboard, height_keyboard = 1000, 500
+# offset_keyboard = (100, 80)
+# width = (1000, 1300)
+
+# keyboard_img = make_black_page(width)
+# test = make_black_page(width)
+
+# keyboard = Keyboard(width_keyboard, height_keyboard, offset_keyboard, "K")
+# keys = keyboard.get_keyboard()
+# current_key = keyboard.current_key
+# dysplay_keyboard(keyboard_img, keys, current_key)
+# # cv2.circle(keyboard_img, (1300, 200), 50, (0, 255, 0), 2)
+# show_window("keyboard", keyboard_img)
+# # show_window("test", test)
+    
+# # Wait for 'q' key to be pressed
+# while True:
+#     key = cv2.waitKey(1) & 0xFF
+#     if key == ord('q'):
+#         break

@@ -5,7 +5,7 @@ import time
 import dlib
 import sys
 import pyttsx3
-
+from projected_keyboard import Keyboard
 
 print("\n\n" + sys.executable)
 # voiceEngine = pyttsx3.init()
@@ -233,26 +233,64 @@ def pupil_on_cut_valid(pupil_on_cut, frame):
     return in_frame_cut
 
 #first frame we want to run this before we start finding the center of mass frame by frame
-def get_calibrated_pupil_threshold(frame):
+#frame: OG frame 720 x 1280  
+def get_calibrated_pupil_threshold(frame, eye_coordinates) -> int:
     #found through minimal testing 
-    DOPE_RATIO_FOR_BW_BALACNCE = .06
-    
-    threshold = 30 #start w arbitrary num
+    RATIO_FOR_BW_BALANCE = 6
+
+    print("calibrating")
+
+    threshold = 20 #start w arbitrary num
     optimized = False
-    while(not optimized): #run until good
-        pass 
 
+    x_cut_min, x_cut_max, y_cut_min, y_cut_max = find_cut_limits(eye_coordinates, 10)
+    crop_pupil_frame = np.copy(frame[y_cut_min:y_cut_max, x_cut_min:x_cut_max, :])
+    print('crop_pupil_frame shape: ', crop_pupil_frame.shape)
 
+    while not optimized:
+        pupil_bw_ratio = get_pupil_bw_ratio(crop_pupil_frame, threshold)
+        pupil_bw_ratio_per = pupil_bw_ratio * 100
+        if(int(np.round(pupil_bw_ratio_per)) == RATIO_FOR_BW_BALANCE): 
+            print(f'found optimization threshold: {threshold}')
+            optimized = True
+        elif(int(np.round(pupil_bw_ratio_per)) < RATIO_FOR_BW_BALANCE):
+            print(f"threshold {threshold} too low") 
+            threshold += 1
+        else:
+            print(f"threshold {threshold} too high")
+            threshold -= 1
 
-def get_pupil_dark_area(frame):
-    # Convert the image from BGR to HSV color space
-    # bgr = cv2.cvtColor(np.copy(frame), cv2.COLOR_GRAY2BGR)
-    hsv_image = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    return threshold
+
+    
+def get_pupil_bw_ratio(frame, threshold):
+    gray_image = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+    # a mask is the same size as our image, but has only two pixel
+    # values, 0 and 255 -- pixels with a value of 0 (background) are
+    # ignored in the original image while mask pixels with a value of
+    # 255 (foreground) are allowed to be kept
+    # Create a binary mask where pixels below the threshold are set to 255 (white) and others to 0 (black)
+    _, binary_mask = cv2.threshold(gray_image, threshold, 255, cv2.THRESH_BINARY)
+
+    # Apply the binary mask to the original image
+    # Create a binary result image
+    result = np.zeros_like(gray_image)
+    result[binary_mask > 0] = 255
+
+    show_window("test", result)
+    cv2.waitKey(1)
+
+    bw_ratio = np.count_nonzero(result == 0) / np.count_nonzero(result == 255)
+    print(f'dope ratio : {bw_ratio}')
+    
+    return bw_ratio
+
+def get_pupil_dark_area_frame(frame, threshold_value):
     gray_image = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
     #so , on the grayscale, any pixel less than 30 will be assigned to 0 or pure blk
-    threshold_value = 35  # Adjust as needed
-
+    # threshold_value = 35  # Adjust as needed
 
     # a mask is the same size as our image, but has only two pixel
     # values, 0 and 255 -- pixels with a value of 0 (background) are
@@ -268,24 +306,6 @@ def get_pupil_dark_area(frame):
     result = np.zeros_like(gray_image)
     result[binary_mask > 0] = 255
 
-    bw_ratio = np.count_nonzero(result == 0) / np.count_nonzero(result == 255)
-    print(f'dope ratio : {bw_ratio}')
-
-    # Define the lower and upper bounds of the color you want to identify
-    #ref this link to try to get good HSV bounds 
-    #https://web.cs.uni-paderborn.de/cgvb/colormaster/web/color-systems/hsv.html
-    # sensitivity = 15
-    # lower_white = np.array([0,0,255-sensitivity])
-    # upper_white = np.array([255,sensitivity,255])
-
-    # # Create a mask using inRange to threshold the image
-    # mask = cv2.inRange(hsv_image, lower_white, upper_white)
-
-    # # Bitwise-AND the original image and the mask to get the result
-    # result = cv2.bitwise_and(frame, frame, mask=mask)
-
-    # result_frame = frame - result
-    
     return result
 
 
@@ -307,14 +327,21 @@ def get_direction_from_center_of_mass(gray_scale_frame, center_mass_coords: tupl
 
     if(center_mass_coords[0] < center_frame_x - (x_threshold_straight * .5)):
         print("LEFT")
+        return "LEFT"
     elif(center_mass_coords[0] > center_frame_x + (x_threshold_straight * .5)):
         print("RIGHT")
+        return "RIGHT"
     else: 
-        print("STRAIGHT")
+        if(center_mass_coords[1] > center_frame_y + (y_threshold_straight * .5)):
+            print("UP")
+            return "UP"
+        elif(center_mass_coords[1] < center_frame_y - (y_threshold_straight * .5)): 
+            print("DOWN")
+            return "DOWN"
+        else:
+            return "STRAIGHT"
+        
 
-
-
-#this function will take the BW frame with the pupil and return the center of mass
 def get_center_of_mass(gray_scale_frame):
     # Find indices where we have mass, the black pixels of the smaller frame
     mass_x, mass_y = np.where(gray_scale_frame == 0)
@@ -330,10 +357,13 @@ def get_center_of_mass(gray_scale_frame):
 
     print(f'cent_x: {cent_x}')
     print(f'cent_y: {cent_y}')
-
-    get_direction_from_center_of_mass(gray_scale_frame, (cent_x, cent_y))
-
     return cent_x, cent_y
+
+#this function will take the BW frame with the pupil and get the direction after doinga  center of mass calculation
+def get_direction(gray_scale_frame):
+    cent_x, cent_y = get_center_of_mass(gray_scale_frame)
+    direction = get_direction_from_center_of_mass(gray_scale_frame, (cent_x, cent_y))
+    return direction
 
 
 
@@ -341,7 +371,10 @@ def get_center_of_mass(gray_scale_frame):
 
 #frame the pupil, step before we search for contrast to locate it within the eye
 #frame: this is the OG frame 720 x 1280 
-def frame_pupil(frame: np.ndarray, frame_w_eye_lines, eye_coordinates) -> np.ndarray:
+#eye_coordinates: where the pupil is located so we can make a clean cut around the eye with some framing
+#threshold: this is the calibrated threshold that we use for the BW conversion
+#keyboard: board object allows ius to change current key 
+def frame_pupil(frame: np.ndarray, eye_coordinates, threshold) -> np.ndarray:
     resize_eye_frame = 4.5 # scaling factor for window's size
     resize_frame = 0.3 # scaling factor for window's size
     end_frame_length = 250 #want final frame to be 250px
@@ -349,11 +382,10 @@ def frame_pupil(frame: np.ndarray, frame_w_eye_lines, eye_coordinates) -> np.nda
     x_cut_min, x_cut_max, y_cut_min, y_cut_max = find_cut_limits(eye_coordinates, 10)
     crop_pupil_frame = np.copy(frame[y_cut_min:y_cut_max, x_cut_min:x_cut_max, :])
     print('crop_pupil_frame shape: ', crop_pupil_frame.shape)
-    pupil_bw_frame = get_pupil_dark_area(crop_pupil_frame)
-    get_center_of_mass(pupil_bw_frame)
-
+    pupil_bw_frame = get_pupil_dark_area_frame(crop_pupil_frame, threshold)
+    direction = get_direction(pupil_bw_frame)
     # crop_frame = np.copy(frame[y_cut_min:y_cut_max, x_cut_min:x_cut_max, :])
-    return pupil_bw_frame
+    return pupil_bw_frame, direction
 
 
 
@@ -369,11 +401,16 @@ def project_on_page(img_from, img_to, point):
 
     return projected_point
 
+# --------------------------------------------------
+
+# -----   ANOTHER FN
+
+
 
 # --------------------------------------------------
 
 # -----   display keys on frame, frame by frame
-def dysplay_keyboard(img, keys):
+def dysplay_keyboard(img, keys, current_key):
     color_board = (255, 250, 100)
     thickness1 = 4
     # i=50
@@ -381,6 +418,13 @@ def dysplay_keyboard(img, keys):
     for key in keys:
         # print("key[0]",key[0])
         # print("key[1]",key[1])
+        # print("key[2]",key[2])
+        # print("key[3]",key[3])
+
+        if(key[0]) == current_key:
+            center = (int(key[1][0]), int(key[1][1]))  # Convert center coordinates to integers
+            cv2.circle(img, center, 48, (0, 0, 255) , 3)
+
 
         cv2.putText(img, key[0], (int(key[1][0]), int(key[1][1])), cv2.FONT_HERSHEY_DUPLEX, 1, (255, 0, 100),
                     thickness=3)
