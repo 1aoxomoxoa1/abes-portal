@@ -1,0 +1,45 @@
+import pygame
+import sys
+
+# Initialize Pygame
+pygame.init()
+
+# Set up display
+width, height = 800, 600
+screen = pygame.display.set_mode((width, height))
+pygame.display.set_caption("Dot Mover")
+
+# Set up dot
+dot_radius = 10
+dot_color = (255, 0, 0)  # Red
+dot_x, dot_y = width // 2, height // 2
+
+# Set up clock
+clock = pygame.time.Clock()
+
+# Main game loop
+while True:
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            pygame.quit()
+            sys.exit()
+
+    keys = pygame.key.get_pressed()
+
+    # Move the dot based on arrow key input
+    if keys[pygame.K_LEFT]:
+        dot_x -= 5
+    if keys[pygame.K_RIGHT]:
+        dot_x += 5
+
+    # Draw background
+    screen.fill((255, 255, 255))  # White
+
+    # Draw the dot
+    pygame.draw.circle(screen, dot_color, (dot_x, dot_y), dot_radius)
+
+    # Update display
+    pygame.display.flip()
+
+    # Cap the frame rate
+    clock.tick(60)

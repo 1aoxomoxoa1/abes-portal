@@ -250,7 +250,7 @@ while(True):
 
             #here we get the pupil_bw_frame
             pupil_bw_frame, direction = frame_pupil(frame, right_eye_coordinates, pupil_threshold)
-            keyboard.get_next_key(direction)
+            keyboard.set_next_key(direction)
 
             # draw circle at pupil_on_keyboard on the keyboard
             # cv2.circle(keyboard_page, (pupil_on_keyboard[0], pupil_on_keyboard[1]), 20, (0, 255, 0), 2)

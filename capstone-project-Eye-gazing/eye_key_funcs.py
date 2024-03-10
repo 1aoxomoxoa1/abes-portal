@@ -236,7 +236,7 @@ def pupil_on_cut_valid(pupil_on_cut, frame):
 #frame: OG frame 720 x 1280  
 def get_calibrated_pupil_threshold(frame, eye_coordinates) -> int:
     #found through minimal testing 
-    RATIO_FOR_BW_BALANCE = 6
+    RATIO_FOR_BW_BALANCE = 5
 
     print("calibrating")
 
@@ -245,6 +245,7 @@ def get_calibrated_pupil_threshold(frame, eye_coordinates) -> int:
 
     x_cut_min, x_cut_max, y_cut_min, y_cut_max = find_cut_limits(eye_coordinates, 10)
     crop_pupil_frame = np.copy(frame[y_cut_min:y_cut_max, x_cut_min:x_cut_max, :])
+
     print('crop_pupil_frame shape: ', crop_pupil_frame.shape)
 
     while not optimized:
@@ -381,7 +382,7 @@ def frame_pupil(frame: np.ndarray, eye_coordinates, threshold) -> np.ndarray:
 
     x_cut_min, x_cut_max, y_cut_min, y_cut_max = find_cut_limits(eye_coordinates, 10)
     crop_pupil_frame = np.copy(frame[y_cut_min:y_cut_max, x_cut_min:x_cut_max, :])
-    print('crop_pupil_frame shape: ', crop_pupil_frame.shape)
+    # print('crop_pupil_frame shape: ', crop_pupil_frame.shape)
     pupil_bw_frame = get_pupil_dark_area_frame(crop_pupil_frame, threshold)
     direction = get_direction(pupil_bw_frame)
     # crop_frame = np.copy(frame[y_cut_min:y_cut_max, x_cut_min:x_cut_max, :])

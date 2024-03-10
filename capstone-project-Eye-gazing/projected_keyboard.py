@@ -85,7 +85,7 @@ class Keyboard:
         print(key_points)
         return key_points
     
-    def get_next_key(self, direction):
+    def set_next_key(self, direction):
         next_key = get_next_key_based_on_direction(self.current_key, direction)
         self.current_key = next_key
 
